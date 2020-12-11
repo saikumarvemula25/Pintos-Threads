@@ -1,0 +1,240 @@
+			+--------------------+
+			|        CS 140      |
+			| PROJECT 1: THREADS |
+			|   DESIGN DOCUMENT  |
+			+--------------------+
+				   
+---- GROUP ----
+
+>> Fill in the names and email addresses of your group members.
+
+
+Saikumar Vemula <svemula2@buffalo.edu>
+Ankit Pratik Behera <abehera@buffalo.edu>
+
+---- PRELIMINARIES ----
+
+>> If you have any preliminary comments on your submission, notes for the
+>> TAs, or extra credit, please give them here.
+
+>> Please cite any offline or online sources you consulted while
+>> preparing your submission, other than the Pintos documentation, course
+>> text, lecture notes, and course staff.
+
+			     ALARM CLOCK
+			     ===========
+
+---- DATA STRUCTURES ----
+
+>> A1: Copy here the declaration of each new or changed `struct' or
+>> `struct' member, global or static variable, `typedef', or
+>> enumeration.  Identify the purpose of each in 25 words or less.
+
+Added two variables st and ti in struct thread to store start ticks and ticks
+    int64_t st;
+    int64_t ti;
+
+Created a struct semaphore
+	struct semaphore almclock
+
+---- ALGORITHMS ----
+
+>> A2: Briefly describe what happens in a call to timer_sleep(),
+>> including the effects of the timer interrupt handler.
+
+In timer_sleep() function
+1) Store start and ticks into current threads variables st and ti
+2) check if ticks has elapsed or not 
+3) if ticks haven't elapsed store the old interrupt value and disable it.
+4) block the thread and push it into waiters list.
+5) reset the interrupt to the old value.
+
+In timer_interrupt () function
+1) check the waiters list to loop through entire list.
+2) Take the begining of the list
+3) check whether ticks elapsed or not if not go to the next element.
+4) if yes then disable interrupts
+5) remove from the waiters list and unblock the thread.
+6) Now set to the older level or reset
+7) Traverse the remaining items in list.
+
+>> A3: What steps are taken to minimize the amount of time spent in
+>> the timer interrupt handler?
+In real time, we do not know how our test cases and scenarios would be so by traversing the whole loop we can remove all the items which ticks have been elapsed due to this list gradually decreases when the threads ticks elapsed and we have a better control on it it only take O(n) time complexity.
+
+---- SYNCHRONIZATION ----
+
+>> A4: How are race conditions avoided when multiple threads call
+>> timer_sleep() simultaneously?
+checking whether ticks have elapsed and resource available, if ticks hasn't elapsed and we have resources then ideally it should be pushed into waiting queue.
+So we placed a if condition it checks timer elapses and any resource available.
+
+>> A5: How are race conditions avoided when a timer interrupt occurs
+>> during a call to timer_sleep()?
+
+we only increment semaphore value when ticks have been elapsed and to avoid race condition we disable interrupts when we accessing semaphore value and unblocking the thread.
+
+---- RATIONALE ----
+
+>> A6: Why did you choose this design?  In what ways is it superior to
+>> another design you considered?
+We choose this design because to avoid busy waiting, To have a semaphore which has waiters list is simple approach but to check whether the ticks elapses then we push the thread to ready queue, so tracking this was a little bit difficult, so pintos has a variable ticks and we increment it whenever timer interrupt occurs in timer_interrupt function so there we are checking ticks has elapsed or not, by using this function we were able to track very simply,instead of creating a new thread to check whether the waiters list threads ticks has elapsed or not.
+
+Our inital design was to create a new thread to track the waiters list,but for tracking as well we need to want CPU time and we don't have any control on CPU and this would make our process very complicated when compared to our new design.
+
+
+			 PRIORITY SCHEDULING
+			 ===================
+
+---- DATA STRUCTURES ----
+
+>> B1: Copy here the declaration of each new or changed `struct' or
+>> `struct' member, global or static variable, `typedef', or
+>> enumeration.  Identify the purpose of each in 25 words or less.
+
+	struct lock *lock1;
+        int orginalpriority in struct thread
+
+>> B2: Explain the data structure used to track priority donation.
+>> Use ASCII art to diagram a nested donation.  (Alternately, submit a
+>> .png file.)
+
+Unable to handle the priority donation facing issues when we do but our approach is to create a global lock where it holds the lock whenever the thread_get_priority calls then we loop through the threads which are available in the lock's semaphore and check whether current running thread priority is lower than the threads which are available in the lock if yes then we copy highest priority thread which is present in the lock into current running threadpriority variable.
+Once the thread which is running releases the ock decrementing its priority variable and hence it yields.
+---- ALGORITHMS ----
+
+>> B3: How do you ensure that the highest priority thread waiting for
+>> a lock, semaphore, or condition variable wakes up first?
+
+So when the sema_up calls the function we are looping through all items which are in sema and getting the higher priority threads and its value once we get the higher priroity thread we are unblocking the value incrementing the sema value and then yielding the current thread as it has low value Similarly we do for cond-signal which contains exactly one threads in semaphore and comparing the thread that is coming from the semaphore of lists and getting the thread priority from it and comparing with other semaphore's threads and yield the higher priority thread.
+
+when we create a thread we choose to compare the current thread priority to the newly created thread priority, if yes then we push our current thread to ready queue and schedule our newly created thread.
+
+>> B4: Describe the sequence of events when a call to lock_acquire()
+>> causes a priority donation.  How is nested donation handled?
+
+directly calls the sema_down.
+if it comes out from sema down we can assure the lock has been held.
+hen we set the global lock variable.
+>> B5: Describe the sequence of events when lock_release() is called
+>> on a lock that a higher-priority thread is waiting for.
+ In lock_release it just release the lock and does sema_up.
+
+---- SYNCHRONIZATION ----
+
+>> B6: Describe a potential race in thread_set_priority() and explain
+>> how your implementation avoids it.  Can you use a lock to avoid
+>> this race?
+We call thread_set_priority func for 2 reasons:
+1)To increase its priority.
+2) To decrease its priority.
+-->if it increases then we don't want to remove it from CPU utilization because our approach was to pick highest priority thread from ready queue(from initially).
+-->  if it want to decrease then we check whether it is the highest on in ready queue if not we simply remove from running and keep it in ready queue andschedule the highest priority thread.
+
+---- RATIONALE ----
+
+>> B7: Why did you choose this design?  In what ways is it superior to
+>> another design you considered?
+
+For strict priority scheduling we choose to modify two functions mainly thread_set_priority and next_thread_to_run as the first function would decide to sets the priority of thread and second function is to decide the next highest priority thread to run For priority scheduling we choose to have a global variable and try modifying the priority value when the thread calls the thread_get_priority by this way we can reuse the data structures which were already created in pintos.
+
+			  ADVANCED SCHEDULER
+			  ==================
+
+---- DATA STRUCTURES ----
+
+>> C1: Copy here the declaration of each new or changed `struct' or
+>> `struct' member, global or static variable, `typedef', or
+>> enumeration.  Identify the purpose of each in 25 words or less.
+    int nice;
+    fixed_point_t recent_cpu; in struct thread
+    fixed_point_t load_avg;   in struct thread
+    void calculate_load_avg(void);
+     to calculate load avg for 1 sec (59/60)*load_avg + (1/60)* readythread count;
+
+    void calculate_thread_priority(struct thread *);
+     To calculate the thread priority for every 4 seconds implemented the below forumla
+     PRIMAX-recentcpu/4-nice * 2
+    fixed_point_t calculate_a(void);
+	to calculate a value which is used in calculating threads recent cpu
+	a = 2*load_avg/2*load_avg+1
+   void calculate_thread_recent_cpu(struct thread* ctr)
+	to calculate  recent cpu =  a * recent cpu + nice;
+
+
+
+---- ALGORITHMS ----
+
+>> C2: Suppose threads A, B, and C have nice values 0, 1, and 2.  Each
+>> has a recent_cpu value of 0.  Fill in the table below showing the
+>> scheduling decision and the priority and recent_cpu values for each
+>> thread after each given number of timer ticks:
+
+timer  recent_cpu    priority   thread
+ticks   A   B   C   A   B   C   to run
+-----  --  --  --  --  --  --   ------
+ 0      0   0   0   63  61  59   A
+ 4      4   0   0   62  61  59   A
+ 8      8   0   0   61  61  59   A
+12      12  0   0   60  61  59   B
+16      12  4   0   60  60  59   B 
+20      12  8   0   60  59  59   A
+24      16  8   0   59  59  59   A 
+28      20  8   0   58  59  59   C  
+32      20  8   4   58  59  58   B 
+36      20  12  4   58  58  58   A
+
+>> C3: Did any ambiguities in the scheduler specification make values
+>> in the table uncertain?  If so, what rule did you use to resolve
+>> them?  Does this match the behavior of your scheduler?
+As when we yield any thread we just push back the thread to the ready queue 
+so when we have equal priority we will pick the thread that is in the list as when 8 ticks we have same priority 61 and A is already running hence it would yield the thread.
+The other case when current thread yield and the other threads have equal priority it then picks the first thread in the queue.
+
+Here recent_cpu increases for thread which is running and for every second it calculates thread_recent_cpu and load_avg and for every ticks
+
+>> C4: How is the way you divided the cost of scheduling between code
+>> inside and outside interrupt context likely to affect performance?
+
+TO schedule algorithms in MLFQS we calculate various things recent cpu,load average and priority of the threads and then if any interrupt occurs we generally run the interrupt and that we generally calculate MLFQS variables to set the priority if the interruts increases the thread priority gets decreases as load_avg increases as many threads havent scheduled or completed so if interrupts increases then it will affect the performance of MLFQS.
+---- RATIONALE ----
+
+>> C5: Briefly critique your design, pointing out advantages and
+>> disadvantages in your design choices.  If you were to have extra
+>> time to work on this part of the project, how might you choose to
+>> refine or improve your design?
+
+  As documents suggests we implementd with O(1) space for recent cpu and O(1) space for load_avg to calculate it, when we calculate recent cpu for threads we have a for loop which it runs for O(n) if we would have extra time we would try to make that one as well to constant time complexity by having extra space for it.
+
+>> C6: The assignment explains arithmetic for fixed-point math in
+>> detail, but it leaves it open to you to implement it.  Why did you
+>> decide to implement it the way you did?  If you created an
+>> abstraction layer for fixed-point math, that is, an abstract data
+>> type and/or a set of functions or macros to manipulate fixed-point
+>> numbers, why did you do so?  If not, why not?
+
+As we used fixed_point_t functions as it gives more flexability to add or to divide or to multiply as pintos doc provides clarity 
+
+			   SURVEY QUESTIONS
+			   ================
+
+Answering these questions is optional, but it will help us improve the
+course in future quarters.  Feel free to tell us anything you
+want--these questions are just to spur your thoughts.  You may also
+choose to respond anonymously in the course evaluations at the end of
+the quarter.
+
+>> In your opinion, was this assignment, or any one of the three problems
+>> in it, too easy or too hard?  Did it take too long or too little time?
+
+>> Did you find that working on a particular part of the assignment gave
+>> you greater insight into some aspect of OS design?
+
+>> Is there some particular fact or hint we should give students in
+>> future quarters to help them solve the problems?  Conversely, did you
+>> find any of our guidance to be misleading?
+
+>> Do you have any suggestions for the TAs to more effectively assist
+>> students, either for future quarters or the remaining projects?
+
+>> Any other comments?
